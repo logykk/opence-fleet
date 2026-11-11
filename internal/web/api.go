@@ -141,8 +141,10 @@ func (s *Server) apiNodes(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) apiJoinToken(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Runtime       string `json:"runtime"`
-		PublicAddress string `json:"public_address"`
+		Runtime       string     `json:"runtime"`
+		PublicAddress string     `json:"public_address"`
+		TunnelPorts   spec.Ports `json:"tunnel_ports"`
+		WebPorts      spec.Ports `json:"web_ports"`
 	}
 	if r.ContentLength > 0 {
 		if err := readJSON(r, &in); err != nil {
@@ -152,6 +154,13 @@ func (s *Server) apiJoinToken(w http.ResponseWriter, r *http.Request) {
 	}
 	settings := spec.DefaultNode()
 	settings.Runtime, settings.PublicAddress = in.Runtime, in.PublicAddress
+	// (the defaults for what the body leaves out)
+	if in.TunnelPorts != nil {
+		settings.TunnelPorts = in.TunnelPorts
+	}
+	if in.WebPorts != nil {
+		settings.WebPorts = in.WebPorts
+	}
 	name := r.PathValue("name")
 	token, err := s.Fleet.JoinToken(r.Context(), s.actor(r), name, settings)
 	if err != nil {

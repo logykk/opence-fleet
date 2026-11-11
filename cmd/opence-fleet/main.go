@@ -457,8 +457,8 @@ func joinToken(args []string) error {
 	values := config.Flags(set, config.Serve)
 	defaults := spec.DefaultNode()
 	runtimeName := set.String("runtime", "docker", "docker or process")
-	tunnelPorts := set.String("tunnel-ports", defaults.TunnelPorts.String(), "the node's tunnel ports (UDP), first-last")
-	webPorts := set.String("web-ports", defaults.WebPorts.String(), "the node's web ports (TCP, on loopback), first-last")
+	tunnelPorts := set.String("tunnel-ports", defaults.TunnelPorts.String(), "the node's tunnel ports (UDP): first-last, or ports by commas")
+	webPorts := set.String("web-ports", defaults.WebPorts.String(), "the node's web ports (TCP, on loopback): first-last, or ports by commas")
 	loopbackBase := set.Int("loopback-base", defaults.LoopbackBase, "the process runtime's first loopback address, 127.0.0.<n>")
 	publicAddress := set.String("public-address", "", "the node's public address, when it is not the one the masters see")
 	quiet := set.Bool("quiet", false, "print the token alone")
@@ -484,10 +484,10 @@ func joinToken(args []string) error {
 	settings := defaults
 	settings.Runtime = *runtimeName
 	settings.LoopbackBase, settings.PublicAddress = *loopbackBase, *publicAddress
-	if settings.TunnelPorts, err = spec.ParsePortRange(*tunnelPorts); err != nil {
+	if settings.TunnelPorts, err = spec.ParsePorts(*tunnelPorts); err != nil {
 		return fmt.Errorf("--tunnel-ports: %w", err)
 	}
-	if settings.WebPorts, err = spec.ParsePortRange(*webPorts); err != nil {
+	if settings.WebPorts, err = spec.ParsePorts(*webPorts); err != nil {
 		return fmt.Errorf("--web-ports: %w", err)
 	}
 	token, err := f.JoinToken(context.Background(), "cli", set.Arg(0), settings)

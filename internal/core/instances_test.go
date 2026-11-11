@@ -64,6 +64,36 @@ func TestAllocation(t *testing.T) {
 	}
 }
 
+// A node's ports need not be contiguous: each server takes the next free
+// one the node was given, gaps and all, and the settings keep the list.
+func TestAllocationFromListedPorts(t *testing.T) {
+	f, _ := fleet(t)
+	ctx := context.Background()
+	settings := spec.DefaultNode()
+	settings.TunnelPorts, settings.WebPorts = spec.Ports{12312, 32212, 57211}, spec.Ports{8101, 9000, 9001}
+	node(t, f, "listed", settings)
+	n, err := f.NodeByName(ctx, "listed")
+	if err != nil || n.Settings.TunnelPorts.String() != "12312, 32212, 57211" || n.Settings.WebPorts.String() != "8101, 9000-9001" {
+		t.Fatalf("%v %v", n.Settings, err)
+	}
+	p := profile(t, f, "Listed")
+	slugs := servers(t, f, p, 3, false, "listed")
+	for k, want := range []where{{12312, 8101, 0}, {32212, 9000, 1}, {57211, 9001, 2}} {
+		if got := placed(t, f, slugs[k]); got != want {
+			t.Fatalf("%s: %+v, not %+v", slugs[k], got, want)
+		}
+	}
+	_, _, err = f.CreateInstances(ctx, "user:paul", CreateRequest{ProfileID: p, Nodes: []string{"listed"}, Count: 1})
+	if e, ok := AsError(err); !ok || e.Code != "full" {
+		t.Fatalf("a fourth: %v", err)
+	}
+	// a list that leaves a server's port out is refused
+	settings.TunnelPorts = spec.Ports{12312, 32212, 57212}
+	if e, ok := AsError(f.SetNodeSettings(ctx, "user:paul", "listed", settings)); !ok || e.Code != "in_use" {
+		t.Fatalf("%v", e)
+	}
+}
+
 func TestAllocationSpreads(t *testing.T) {
 	f, _ := fleet(t)
 	a, _ := node(t, f, "a", spec.DefaultNode())
@@ -92,13 +122,13 @@ func TestAllocationFull(t *testing.T) {
 		settings spec.Node
 		fits     int
 	}{
-		{"ports", spec.Node{TunnelPorts: spec.PortRange{First: 3000, Last: 3001}, WebPorts: spec.PortRange{First: 4000, Last: 4009},
+		{"ports", spec.Node{TunnelPorts: spec.PortRange(3000, 3001), WebPorts: spec.PortRange(4000, 4009),
 			LoopbackBase: 2}, 2},
-		{"web ports", spec.Node{TunnelPorts: spec.PortRange{First: 3000, Last: 3009}, WebPorts: spec.PortRange{First: 4000, Last: 4002},
+		{"web ports", spec.Node{TunnelPorts: spec.PortRange(3000, 3009), WebPorts: spec.PortRange(4000, 4002),
 			LoopbackBase: 2}, 3},
 		// (127.0.0.249 and 127.0.0.250 alone)
-		{"loopback addresses", spec.Node{TunnelPorts: spec.PortRange{First: 3000, Last: 3009},
-			WebPorts: spec.PortRange{First: 4000, Last: 4009}, LoopbackBase: 249}, 2},
+		{"loopback addresses", spec.Node{TunnelPorts: spec.PortRange(3000, 3009),
+			WebPorts: spec.PortRange(4000, 4009), LoopbackBase: 249}, 2},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -156,7 +186,7 @@ func TestNodeSettingsKeepTheirServers(t *testing.T) {
 	servers(t, f, profile(t, f, "Ranked"), 2, false, "a")
 	// a range that leaves a server's port out is refused
 	narrow := spec.DefaultNode()
-	narrow.TunnelPorts = spec.PortRange{First: 2303, Last: 2399}
+	narrow.TunnelPorts = spec.PortRange(2303, 2399)
 	if e, ok := AsError(f.SetNodeSettings(ctx, "user:paul", "a", narrow)); !ok || e.Code != "in_use" {
 		t.Fatalf("%v", e)
 	}

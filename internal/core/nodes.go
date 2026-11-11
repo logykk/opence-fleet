@@ -108,7 +108,7 @@ func (f *Fleet) Join(ctx context.Context, r JoinRequest) (string, string, error)
 	token := Token(32)
 	var settings spec.Node
 	json.Unmarshal([]byte(joinToken.Settings), &settings)
-	if settings.TunnelPorts.First == 0 {
+	if len(settings.TunnelPorts) == 0 {
 		settings = spec.DefaultNode()
 	}
 	if settings.Runtime == "" && (r.Runtime == "docker" || r.Runtime == "process") {
@@ -153,7 +153,7 @@ func (f *Fleet) SetNodeSettings(ctx context.Context, actor, name string, setting
 	}
 	for _, i := range instances {
 		if !settings.TunnelPorts.Contains(int(i.TunnelPort)) || !settings.WebPorts.Contains(int(i.WebPort)) {
-			return Refuse(http.StatusConflict, "in_use", "%s has ports outside the new ranges (tunnel %d, web %d): move it first",
+			return Refuse(http.StatusConflict, "in_use", "%s has ports outside the new ones (tunnel %d, web %d): move it first",
 				i.Slug, i.TunnelPort, i.WebPort)
 		}
 	}

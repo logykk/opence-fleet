@@ -152,20 +152,28 @@ func TestNames(t *testing.T) {
 	if PublicAddress("2001:db8::1", 2302) != "[2001:db8::1]:2302" || PublicAddress("host:2400", 2302) != "host:2400" {
 		t.Fatal()
 	}
-	r, err := ParsePortRange("2302-2399")
+	r, err := ParsePorts("2302-2399")
 	if err != nil || !r.Contains(2302) || r.Contains(2400) {
 		t.Fatal(r, err)
 	}
-	if _, err := ParsePortRange("80-90"); err == nil {
+	if _, err := ParsePorts("80-90"); err == nil {
 		t.Fatal("a privileged range parsed")
 	}
 	n := DefaultNode()
 	if err := n.Check(); err != nil {
 		t.Fatal(err)
 	}
-	n.WebPorts = PortRange{2350, 2360}
+	n.WebPorts = PortRange(2350, 2360)
 	if err := n.Check(); err == nil {
 		t.Fatal("overlapping ranges passed")
+	}
+	n.WebPorts = Ports{8101, 2399}
+	if err := n.Check(); err == nil {
+		t.Fatal("a web port among the tunnel ports passed")
+	}
+	n.WebPorts = Ports{}
+	if err := n.Check(); err == nil {
+		t.Fatal("no web ports passed")
 	}
 	img := Image{Build: "build-211", Ref: "ghcr.io/opencommunityedition/opence-server:build-211", Digest: "sha256:ab"}
 	if img.Pull() != "ghcr.io/opencommunityedition/opence-server@sha256:ab" {
@@ -178,6 +186,48 @@ func TestNames(t *testing.T) {
 	img.Digest = "sha256:cd"
 	if img.Pull() != "localhost:5000/opence-server@sha256:cd" {
 		t.Fatal(img.Pull())
+	}
+}
+
+// A node's ports are a range or a list (a host hands out whichever ports it
+// has free); a range keeps the JSON it always had, which older agents read.
+func TestPorts(t *testing.T) {
+	var n Node
+	if err := json.Unmarshal([]byte(`{"tunnel_ports": [57211, 12312, 32212, 12312], "web_ports": {"first": 8101, "last": 8103}}`), &n); err != nil {
+		t.Fatal(err)
+	}
+	if n.TunnelPorts.String() != "12312, 32212, 57211" || n.WebPorts.String() != "8101-8103" || !n.TunnelPorts.Contains(32212) ||
+		n.TunnelPorts.Contains(2302) {
+		t.Fatal(n.TunnelPorts, n.WebPorts)
+	}
+	n.LoopbackBase = 2
+	if err := n.Check(); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := json.Marshal(n)
+	if !strings.Contains(string(data), `"tunnel_ports":[12312,32212,57211],"web_ports":{"first":8101,"last":8103}`) {
+		t.Fatal(string(data))
+	}
+	for text, want := range map[string]string{"2302-2399": "2302-2399", " 12312, 32212 ,57211 ": "12312, 32212, 57211",
+		"2400, 2302-2304, 2305": "2302-2305, 2400", "3000 - 3001": "3000-3001"} {
+		if p, err := ParsePorts(text); err != nil || p.String() != want {
+			t.Errorf("%q: %v %v", text, p, err)
+		}
+	}
+	for _, text := range []string{"", ",", "2302-", "80", "2399-2302", "65536", "a, 2302"} {
+		if p, err := ParsePorts(text); err == nil {
+			t.Errorf("%q parsed: %v", text, p)
+		}
+	}
+	for _, text := range []string{`{"first": 2399, "last": 2302}`, `{"first": 0, "last": 1000000000}`, `"2302"`} {
+		var p Ports
+		if err := json.Unmarshal([]byte(text), &p); err == nil {
+			t.Errorf("%s decoded: %v", text, p)
+		}
+	}
+	n.TunnelPorts = Ports{80, 2302}
+	if err := n.Check(); err == nil {
+		t.Fatal("a privileged port passed")
 	}
 }
 

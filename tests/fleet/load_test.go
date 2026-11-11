@@ -25,8 +25,8 @@ func TestManyEvents(t *testing.T) {
 	ctx := context.Background()
 	settings := spec.DefaultNode()
 	settings.Runtime = "process"
-	settings.TunnelPorts = spec.PortRange{First: 43000, Last: 43199}
-	settings.WebPorts = spec.PortRange{First: 43200, Last: 43399}
+	settings.TunnelPorts = spec.PortRange(43000, 43199)
+	settings.WebPorts = spec.PortRange(43200, 43399)
 	token, err := h.fleet.JoinToken(ctx, "test", "busy", settings)
 	if err != nil {
 		t.Fatal(err)

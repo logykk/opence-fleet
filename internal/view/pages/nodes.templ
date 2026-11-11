@@ -158,10 +158,10 @@ templ NodePage(p view.Page, c view.NodeCard, rows []view.ServerRow, hello string
 										<option value="process" selected?={ c.Settings.Runtime == "process" }>process</option>
 									</select>
 								}
-								@parts.Field("tunnel", "Tunnel ports (UDP)", "Open them to the internet.") {
+								@parts.Field("tunnel", "Tunnel ports (UDP)", "A range (2302-2399) or ports by commas (12312, 32212). Open them to the internet.") {
 									<input id="tunnel" name="tunnel_ports" class={ view.Input } value={ c.Settings.TunnelPorts.String() }/>
 								}
-								@parts.Field("web", "Web ports (TCP, the node's loopback)", "") {
+								@parts.Field("web", "Web ports (TCP, the node's loopback)", "A range or ports by commas.") {
 									<input id="web" name="web_ports" class={ view.Input } value={ c.Settings.WebPorts.String() }/>
 								}
 								@parts.Field("public", "Public address", "Behind a NAT: the address players reach.") {

@@ -24,8 +24,8 @@ func (h *harness) dockerNode(docker *dockerapi.Client, name string, base int) fu
 	h.t.Helper()
 	settings := spec.DefaultNode()
 	settings.Runtime = "docker"
-	settings.TunnelPorts = spec.PortRange{First: base, Last: base + 9}
-	settings.WebPorts = spec.PortRange{First: base + 100, Last: base + 109}
+	settings.TunnelPorts = spec.PortRange(base, base+9)
+	settings.WebPorts = spec.PortRange(base+100, base+109)
 	ctx := context.Background()
 	token, err := h.fleet.JoinToken(ctx, "test", name, settings)
 	if err != nil {

@@ -251,7 +251,7 @@ func TestClosedBeforeTheSession(t *testing.T) {
 func TestSpecOnConnectAndOnChange(t *testing.T) {
 	h, s, url := start(t)
 	conn, first := connect(t, url, "token-alpha")
-	if first.Node.TunnelPorts != spec.DefaultNode().TunnelPorts || first.Generation == 0 {
+	if first.Node.TunnelPorts.String() != spec.DefaultNode().TunnelPorts.String() || first.Generation == 0 {
 		t.Fatalf("%+v", first)
 	}
 	s.mu.Lock()

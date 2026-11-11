@@ -7,53 +7,168 @@
 package spec
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"math"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-// PortRange is a first and last port.
-type PortRange struct {
+// Ports is a node's set of ports: a range, or whichever ports the machine's
+// host handed it (a hosting platform promises no contiguous block, so the
+// fleet assumes none). Parsing and decoding keep it sorted, without repeats.
+type Ports []int
+
+// PortRange is the ports from first to last.
+func PortRange(first, last int) Ports {
+	if first < 0 || last > 65535 || last < first {
+		return nil
+	}
+	out := make(Ports, 0, last-first+1)
+	for p := first; p <= last; p++ {
+		out = append(out, p)
+	}
+	return out
+}
+
+// Contains tells whether a port is in the set.
+func (p Ports) Contains(port int) bool { return slices.Contains(p, port) }
+
+// Overlaps tells whether two sets share a port.
+func (p Ports) Overlaps(other Ports) bool {
+	seen := make(map[int]bool, len(p))
+	for _, port := range p {
+		seen[port] = true
+	}
+	for _, port := range other {
+		if seen[port] {
+			return true
+		}
+	}
+	return false
+}
+
+// contiguous tells whether the set is one range, first to last.
+func (p Ports) contiguous() bool {
+	if len(p) == 0 {
+		return false
+	}
+	for k, port := range p {
+		if port != p[0]+k {
+			return false
+		}
+	}
+	return true
+}
+
+// String writes the set as ParsePorts reads it: "2302-2399", or
+// "12312, 32212, 57211" (runs of neighbours as ranges).
+func (p Ports) String() string {
+	var parts []string
+	for k := 0; k < len(p); {
+		end := k
+		for end+1 < len(p) && p[end+1] == p[end]+1 {
+			end++
+		}
+		if end > k {
+			parts = append(parts, fmt.Sprintf("%d-%d", p[k], p[end]))
+		} else {
+			parts = append(parts, strconv.Itoa(p[k]))
+		}
+		k = end + 1
+	}
+	return strings.Join(parts, ", ")
+}
+
+// portRange is the JSON of a contiguous set, as every fleet before lists
+// wrote it.
+type portRange struct {
 	First int `json:"first"`
 	Last  int `json:"last"`
 }
 
-// Contains tells whether a port is in the range.
-func (r PortRange) Contains(port int) bool { return port >= r.First && port <= r.Last }
-
-// String writes the range as first-last.
-func (r PortRange) String() string { return fmt.Sprintf("%d-%d", r.First, r.Last) }
-
-// ParsePortRange reads "2302-2399" (or a single port).
-func ParsePortRange(text string) (PortRange, error) {
-	first, last, found := strings.Cut(strings.TrimSpace(text), "-")
-	a, err := strconv.Atoi(strings.TrimSpace(first))
-	if err != nil {
-		return PortRange{}, fmt.Errorf("%q is not a port range (2302-2399)", text)
+// MarshalJSON writes a range as {"first": 2302, "last": 2399} and any other
+// set as a list, [12312, 32212, 57211]. (A range keeps its old shape so an
+// older agent still reads its spec: one that predates lists ignores a spec
+// with a list until it is updated.)
+func (p Ports) MarshalJSON() ([]byte, error) {
+	if p.contiguous() {
+		return json.Marshal(portRange{p[0], p[len(p)-1]})
 	}
-	b := a
-	if found {
-		if b, err = strconv.Atoi(strings.TrimSpace(last)); err != nil {
-			return PortRange{}, fmt.Errorf("%q is not a port range (2302-2399)", text)
+	return json.Marshal([]int(p))
+}
+
+// UnmarshalJSON reads either shape MarshalJSON writes.
+func (p *Ports) UnmarshalJSON(data []byte) error {
+	data = bytes.TrimSpace(data)
+	switch {
+	case bytes.Equal(data, []byte("null")):
+		return nil
+	case len(data) > 0 && data[0] == '{':
+		var r portRange
+		if err := json.Unmarshal(data, &r); err != nil {
+			return err
 		}
+		if r.First < 0 || r.Last > 65535 || r.Last < r.First {
+			return fmt.Errorf("ports %d to %d: ports from 1024 to 65535, the first not past the last", r.First, r.Last)
+		}
+		*p = PortRange(r.First, r.Last)
+		return nil
 	}
-	r := PortRange{a, b}
-	if a < 1024 || b > 65535 || b < a {
-		return r, fmt.Errorf("%q: ports from 1024 to 65535, the first not past the last", text)
+	var list []int
+	if err := json.Unmarshal(data, &list); err != nil {
+		return fmt.Errorf("ports are a range ({\"first\": 2302, \"last\": 2399}) or a list ([12312, 32212]): %w", err)
 	}
-	return r, nil
+	*p = normalPorts(list)
+	return nil
+}
+
+func normalPorts(list []int) Ports {
+	out := Ports(slices.Clone(list))
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+// ParsePorts reads ranges and ports by commas: "2302-2399",
+// "12312, 32212, 57211" or "2302-2309, 2400".
+func ParsePorts(text string) (Ports, error) {
+	var list []int
+	for _, item := range strings.Split(text, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		first, last, found := strings.Cut(item, "-")
+		a, err := strconv.Atoi(strings.TrimSpace(first))
+		b := a
+		if err == nil && found {
+			b, err = strconv.Atoi(strings.TrimSpace(last))
+		}
+		if err != nil {
+			return nil, fmt.Errorf("%q is not a port or a range: write 2302-2399, or ports by commas (12312, 32212)", item)
+		}
+		if a < 1024 || b > 65535 || b < a {
+			return nil, fmt.Errorf("%q: ports from 1024 to 65535, the first not past the last", item)
+		}
+		list = append(list, PortRange(a, b)...)
+	}
+	if len(list) == 0 {
+		return nil, fmt.Errorf("no ports: write a range (2302-2399), or ports by commas (12312, 32212)")
+	}
+	return normalPorts(list), nil
 }
 
 // Node is a node's settings, which the control plane keeps (the node page
 // changes them) and sends in each spec.
 type Node struct {
 	// docker or process ("": the agent's own FLEET_AGENT_RUNTIME)
-	Runtime     string    `json:"runtime,omitempty"`
-	TunnelPorts PortRange `json:"tunnel_ports"`
-	WebPorts    PortRange `json:"web_ports"`
+	Runtime     string `json:"runtime,omitempty"`
+	TunnelPorts Ports  `json:"tunnel_ports"`
+	WebPorts    Ports  `json:"web_ports"`
 	// the process runtime's first loopback address, 127.0.0.<base>
 	LoopbackBase  int    `json:"loopback_base"`
 	PublicAddress string `json:"public_address,omitempty"`
@@ -70,7 +185,7 @@ type Node struct {
 
 // DefaultNode is a new node's settings.
 func DefaultNode() Node {
-	return Node{TunnelPorts: PortRange{2302, 2399}, WebPorts: PortRange{8101, 8199}, LoopbackBase: 2,
+	return Node{TunnelPorts: PortRange(2302, 2399), WebPorts: PortRange(8101, 8199), LoopbackBase: 2,
 		MemoryMB: 600, CPUs: 1}
 }
 
@@ -81,12 +196,20 @@ func (n Node) Check() error {
 	default:
 		return fmt.Errorf("the runtime is docker or process")
 	}
-	for _, r := range []PortRange{n.TunnelPorts, n.WebPorts} {
-		if r.First < 1024 || r.Last > 65535 || r.Last < r.First {
-			return fmt.Errorf("port range %s: ports from 1024 to 65535", r)
+	for _, set := range []struct {
+		name  string
+		ports Ports
+	}{{"tunnel", n.TunnelPorts}, {"web", n.WebPorts}} {
+		if len(set.ports) == 0 {
+			return fmt.Errorf("the node has no %s ports: give a range (2302-2399) or a list of ports", set.name)
+		}
+		for _, port := range set.ports {
+			if port < 1024 || port > 65535 {
+				return fmt.Errorf("%s port %d: ports from 1024 to 65535", set.name, port)
+			}
 		}
 	}
-	if n.TunnelPorts.First <= n.WebPorts.Last && n.WebPorts.First <= n.TunnelPorts.Last {
+	if n.TunnelPorts.Overlaps(n.WebPorts) {
 		return fmt.Errorf("the tunnel ports (%s) and the web ports (%s) overlap", n.TunnelPorts, n.WebPorts)
 	}
 	if n.LoopbackBase < 2 || n.LoopbackBase > 250 {

@@ -356,6 +356,45 @@ func TestAPITokenNeedsNoCSRF(t *testing.T) {
 	}
 }
 
+// The API's join token takes the node's ports, a list or a range (a host
+// that hands out ports promises no contiguous block).
+func TestJoinTokenPorts(t *testing.T) {
+	x := newFixture(t, nil, true)
+	token := x.apiToken(auth.Admin)
+	r := bearer(request(http.MethodPost, "/api/v1/nodes/listed/join-token", loopback,
+		strings.NewReader(`{"tunnel_ports": [57211, 12312, 32212], "web_ports": {"first": 9000, "last": 9009}}`)), token)
+	r.Header.Set("Content-Type", "application/json")
+	w := x.do(r)
+	var answer struct {
+		Token string `json:"token"`
+	}
+	if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &answer) != nil || answer.Token == "" {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	ctx := context.Background()
+	if _, _, err := x.fleet.Join(ctx, core.JoinRequest{Token: answer.Token, Runtime: "process"}); err != nil {
+		t.Fatal(err)
+	}
+	n, err := x.fleet.NodeByName(ctx, "listed")
+	if err != nil || n.Settings.TunnelPorts.String() != "12312, 32212, 57211" || n.Settings.WebPorts.String() != "9000-9009" {
+		t.Fatalf("%v %v", n.Settings, err)
+	}
+	// the nodes' JSON: the list as a list, the range as it always was
+	w = x.do(bearer(request(http.MethodGet, "/api/v1/nodes", loopback, nil), token))
+	if !strings.Contains(w.Body.String(), `"tunnel_ports":[12312,32212,57211],"web_ports":{"first":9000,"last":9009}`) {
+		t.Fatalf("%s", w.Body)
+	}
+	// no ports, and ports that are not ones, are refused
+	for _, body := range []string{`{"tunnel_ports": []}`, `{"tunnel_ports": [80]}`, `{"tunnel_ports": "2302"}`,
+		`{"tunnel_ports": [8101], "web_ports": [8101]}`} {
+		r := bearer(request(http.MethodPost, "/api/v1/nodes/other/join-token", loopback, strings.NewReader(body)), token)
+		r.Header.Set("Content-Type", "application/json")
+		if w := x.do(r); w.Code != http.StatusBadRequest {
+			t.Errorf("%s: %d %s", body, w.Code, w.Body)
+		}
+	}
+}
+
 func TestSetupLink(t *testing.T) {
 	x := newFixture(t, nil, false)
 	ctx := context.Background()

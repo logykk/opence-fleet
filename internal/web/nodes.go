@@ -128,11 +128,11 @@ func (s *Server) nodeSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	settings := n.Settings
 	settings.Runtime = r.FormValue("runtime")
-	if settings.TunnelPorts, err = spec.ParsePortRange(r.FormValue("tunnel_ports")); err != nil {
+	if settings.TunnelPorts, err = spec.ParsePorts(r.FormValue("tunnel_ports")); err != nil {
 		s.fail(w, r, "/nodes/"+name, err)
 		return
 	}
-	if settings.WebPorts, err = spec.ParsePortRange(r.FormValue("web_ports")); err != nil {
+	if settings.WebPorts, err = spec.ParsePorts(r.FormValue("web_ports")); err != nil {
 		s.fail(w, r, "/nodes/"+name, err)
 		return
 	}

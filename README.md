@@ -74,10 +74,15 @@ internet (UDP, 2302-2399 by default: `ufw allow 2302:2399/udp`). Docker
 publishes ports with its own iptables rules, which bypass `ufw`'s input
 chain; a server's web port is bound to the node's loopback regardless.
 
-A node that runs servers is amd64 (the game is 32-bit x86). The port
-ranges, the public address, the limits per container (600 MB and one core
+A node that runs servers is amd64 (the game is 32-bit x86). Its tunnel and
+web ports, the public address, the limits per container (600 MB and one core
 by default) and the loopback base of the process runtime are node settings
-on the node's page.
+on the node's page. The ports need not be contiguous: a range (`2302-2399`),
+ports by commas (`12312, 32212, 57211`) or both; in JSON (the API, `spec.json`)
+a range is `{"first": 2302, "last": 2399}` and any other set a list,
+`[12312, 32212, 57211]`. An agent older than lists ignores a spec with a
+list until it is updated (its servers keep running), so update the agents
+before giving a node ports that are not a range.
 
 ### Without Docker
 

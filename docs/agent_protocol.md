@@ -93,7 +93,7 @@ next generation), `pending` (waiting for its build or library items).
 
 | Type | Fields |
 | --- | --- |
-| `spec` | the node's desired state, whole: `generation`, `node` (its settings: runtime, port ranges, loopback base, public address, limits), `images` / `releases` (the builds its servers need, with digests or hashes and URLs), `library` (items with SHA-256 and paths), `instances` (each with its slug, generation, build, running, ports, loopback index, the rendered `config.toml`, `init.txt`, gametypes and environment, its web password; see `internal/spec`) |
+| `spec` | the node's desired state, whole: `generation`, `node` (its settings: runtime, tunnel and web ports (each `{"first", "last"}` for a range, else a list), loopback base, public address, limits), `images` / `releases` (the builds its servers need, with digests or hashes and URLs), `library` (items with SHA-256 and paths), `instances` (each with its slug, generation, build, running, ports, loopback index, the rendered `config.toml`, `init.txt`, gametypes and environment, its web password; see `internal/spec`) |
 | `api` | `id`, `slug`, `method`, `path`, `body`: a request to the server's HTTP API, made by the agent with the server's own session; the reply carries its `status` and `body` as the server answered |
 | `console` | `id`, `slug`, `line`: a line typed on the server's standard input (the owner's console); the reply's `lines` are what the server printed for it |
 | `control` | `id`, `slug`, `action` and its fields (below) |

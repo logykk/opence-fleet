@@ -1138,7 +1138,7 @@ func NodePage(p view.Page, c view.NodeCard, rows []view.ServerRow, hello string,
 							}
 							return nil
 						})
-						templ_7745c5c3_Err = parts.Field("tunnel", "Tunnel ports (UDP)", "Open them to the internet.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var61), templ_7745c5c3_Buffer)
+						templ_7745c5c3_Err = parts.Field("tunnel", "Tunnel ports (UDP)", "A range (2302-2399) or ports by commas (12312, 32212). Open them to the internet.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var61), templ_7745c5c3_Buffer)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -1191,7 +1191,7 @@ func NodePage(p view.Page, c view.NodeCard, rows []view.ServerRow, hello string,
 							}
 							return nil
 						})
-						templ_7745c5c3_Err = parts.Field("web", "Web ports (TCP, the node's loopback)", "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var65), templ_7745c5c3_Buffer)
+						templ_7745c5c3_Err = parts.Field("web", "Web ports (TCP, the node's loopback)", "A range or ports by commas.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var65), templ_7745c5c3_Buffer)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}

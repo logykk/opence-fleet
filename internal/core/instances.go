@@ -334,9 +334,9 @@ func (f *Fleet) CreateInstances(ctx context.Context, actor string, r CreateReque
 			}
 			tunnel := free(n.Settings.TunnelPorts, used[n.ID]["tunnel"])
 			web := free(n.Settings.WebPorts, used[n.ID]["web"])
-			loopback := free(spec.PortRange{First: 0, Last: 250 - n.Settings.LoopbackBase}, used[n.ID]["loopback"])
+			loopback := free(spec.PortRange(0, 250-n.Settings.LoopbackBase), used[n.ID]["loopback"])
 			if tunnel < 0 || web < 0 || loopback < 0 {
-				return Refuse(http.StatusConflict, "full", "node %s has no free port left in its ranges (tunnel %s, web %s)",
+				return Refuse(http.StatusConflict, "full", "node %s has no free port left (tunnel %s, web %s)",
 					n.Name, n.Settings.TunnelPorts, n.Settings.WebPorts)
 			}
 			used[n.ID]["tunnel"][tunnel], used[n.ID]["web"][web], used[n.ID]["loopback"][loopback] = true, true, true
@@ -388,8 +388,8 @@ func (f *Fleet) CreateInstances(ctx context.Context, actor string, r CreateReque
 	return created, warnings, nil
 }
 
-func free(r spec.PortRange, used map[int64]bool) int64 {
-	for p := r.First; p <= r.Last; p++ {
+func free(ports spec.Ports, used map[int64]bool) int64 {
+	for _, p := range ports {
 		if !used[int64(p)] {
 			return int64(p)
 		}

@@ -53,7 +53,7 @@ reach a server.
 | --- | --- | --- |
 | `GET /api/v1/me` | viewer | the token's user and role |
 | `GET /api/v1/nodes` | viewer | nodes: online, versions, facts, settings, instances |
-| `POST /api/v1/nodes/{name}/join-token` | admin | a join token and the one-liner (`{"runtime": "docker"\|"process", "public_address": ""}`) |
+| `POST /api/v1/nodes/{name}/join-token` | admin | a join token and the one-liner (`{"runtime": "docker"\|"process", "public_address": "", "tunnel_ports": [12312, 32212, 57211], "web_ports": {"first": 8101, "last": 8199}}`; the ports a list or a range, the defaults when left out) |
 | `DELETE /api/v1/nodes/{name}` | admin | forget a node (its token revoked; refused while it has servers) |
 | `GET /api/v1/instances` | viewer | every server with its live state (`?group=`) |
 | `GET /api/v1/instances/{slug}` | viewer | one server, with its last status |

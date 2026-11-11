@@ -120,8 +120,8 @@ func TestRealGame(t *testing.T) {
 	// ---------- the node: the container runtime, the maps as its data
 	settings := spec.DefaultNode()
 	settings.Runtime = "docker"
-	settings.TunnelPorts = spec.PortRange{First: 42900, Last: 42909}
-	settings.WebPorts = spec.PortRange{First: 42950, Last: 42959}
+	settings.TunnelPorts = spec.PortRange(42900, 42909)
+	settings.WebPorts = spec.PortRange(42950, 42959)
 	token, err := f.JoinToken(ctx, "test", node, settings)
 	if err != nil {
 		t.Fatal(err)
